@@ -22,6 +22,11 @@ class ClassRoom extends Model
         return $this->hasMany(Student::class);
     }
 
+    public function scores()
+    {
+        return $this->hasManyThrough(Score::class, Student::class);
+    }
+
     public function subjectTeachers()
     {
         return $this->hasMany(SubjectTeacher::class);

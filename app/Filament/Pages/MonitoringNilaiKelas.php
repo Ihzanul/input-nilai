@@ -102,25 +102,32 @@ class MonitoringNilaiKelas extends Page implements HasForms, HasTable
         $year = $this->getActiveYear();
         if (!$year) return collect();
 
-        return ClassRoom::orderBy('name')->get()->map(function (ClassRoom $classRoom) use ($year) {
-            $subjects  = SubjectTeacher::where('class_room_id', $classRoom->id)->where('academic_year_id', $year->id)->count();
-            $students  = $classRoom->students()->count();
-            $expected  = $subjects * $students;
-            $submitted = Score::whereHas('student', fn($q) => $q->where('class_room_id', $classRoom->id))
-                ->where('academic_year_id', $year->id)->whereNotNull('score_us')->count();
-            $pct = $expected > 0 ? round(($submitted / $expected) * 100) : 0;
+        return ClassRoom::with('waliKelas')
+            ->withCount('students')
+            ->withCount(['subjectTeachers' => fn($q) => $q->where('academic_year_id', $year->id)])
+            ->withCount(['scores as submitted_count' => fn($q) => 
+                $q->where('scores.academic_year_id', $year->id)->whereNotNull('score_us')
+            ])
+            ->orderBy('name')
+            ->get()
+            ->map(function (ClassRoom $classRoom) {
+                $subjects  = $classRoom->subject_teachers_count;
+                $students  = $classRoom->students_count;
+                $expected  = $subjects * $students;
+                $submitted = $classRoom->submitted_count;
+                $pct = $expected > 0 ? round(($submitted / $expected) * 100) : 0;
 
-            return [
-                'id'        => $classRoom->id,
-                'name'      => $classRoom->name,
-                'wali'      => $classRoom->waliKelas?->name ?? '—',
-                'students'  => $students,
-                'subjects'  => $subjects,
-                'submitted' => $submitted,
-                'expected'  => $expected,
-                'pct'       => $pct,
-            ];
-        });
+                return [
+                    'id'        => $classRoom->id,
+                    'name'      => $classRoom->name,
+                    'wali'      => $classRoom->waliKelas?->name ?? '—',
+                    'students'  => $students,
+                    'subjects'  => $subjects,
+                    'submitted' => $submitted,
+                    'expected'  => $expected,
+                    'pct'       => $pct,
+                ];
+            });
     }
 
     public function getDetailStats(): array

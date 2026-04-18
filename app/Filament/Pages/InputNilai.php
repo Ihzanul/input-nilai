@@ -99,6 +99,9 @@ class InputNilai extends Page implements HasForms, HasTable
 
     public function table(Table $table): Table
     {
+        $academicYear = AcademicYear::find($this->academic_year_id);
+        $isYearActive = $academicYear ? $academicYear->is_active : false;
+
         return $table
             ->query(function () {
                 if (!$this->academic_year_id || !$this->class_room_id || !$this->subject_id) {
@@ -140,10 +143,8 @@ class InputNilai extends Page implements HasForms, HasTable
                     ->label('Nilai US')
                     ->type('number')
                     ->rules(['min:0', 'max:100'])
-                    ->disabled(function ($record) {
-                        if ($record->is_locked) return true;
-                        $academicYear = AcademicYear::find($this->academic_year_id);
-                        return $academicYear ? !$academicYear->is_active : false;
+                    ->disabled(function ($record) use ($isYearActive) {
+                        return $record->is_locked || !$isYearActive;
                     })
                     ->updateStateUsing(function ($record, $state) {
                         try {
