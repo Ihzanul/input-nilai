@@ -63,6 +63,7 @@
     background: linear-gradient(to right, rgba(0,0,0,0.25), transparent);
 }
 </style>
+
 @php
     $year      = $this->getActiveYear();
     $classRoom = $this->getSelectedClassRoom();
@@ -88,51 +89,10 @@
         </x-filament::section>
     @endif
 
-    {{-- ── Admin tanpa kelas dipilih: tampilkan ringkasan via blade table ── --}}
+    {{-- ── Admin tanpa kelas dipilih: Tampilkan Filament Table Native ── --}}
     @if ($isAdmin && !$classRoom)
-        @php $summaries = $this->getClassSummaries(); @endphp
-
         <x-filament::section heading="Ringkasan Semua Kelas — {{ $year->name }}">
-            <div class="overflow-x-auto -mx-6 -mb-6">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-200 dark:border-gray-700">
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Kelas</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Wali Kelas</th>
-                            <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Siswa</th>
-                            <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Mapel</th>
-                            <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Nilai Masuk</th>
-                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Progres</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                        @forelse ($summaries as $row)
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors">
-                                <td class="px-6 py-3 font-semibold text-gray-900 dark:text-white">{{ $row['name'] }}</td>
-                                <td class="px-6 py-3 text-gray-600 dark:text-gray-400">{{ $row['wali'] }}</td>
-                                <td class="px-6 py-3 text-center text-gray-700 dark:text-gray-300">{{ $row['students'] }}</td>
-                                <td class="px-6 py-3 text-center text-gray-700 dark:text-gray-300">{{ $row['subjects'] }}</td>
-                                <td class="px-6 py-3 text-center text-gray-700 dark:text-gray-300">{{ $row['submitted'] }} / {{ $row['expected'] }}</td>
-                                <td class="px-6 py-3">
-                                    <div class="flex items-center gap-2 justify-end">
-                                        <div class="flex-1 min-w-[80px] bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                                            <div class="h-1.5 rounded-full transition-all
-                                                {{ $row['pct'] == 100 ? 'bg-emerald-500' : ($row['pct'] >= 50 ? 'bg-amber-400' : 'bg-red-400') }}"
-                                                style="width: {{ $row['pct'] }}%"></div>
-                                        </div>
-                                        <span class="text-xs font-semibold tabular-nums w-9 text-right
-                                            {{ $row['pct'] == 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-400' }}">
-                                            {{ $row['pct'] }}%
-                                        </span>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="6" class="px-6 py-8 text-center text-sm text-gray-400">Belum ada data kelas.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+            {{ $this->table }}
         </x-filament::section>
 
     {{-- ── Wali kelas belum di-assign ── --}}
@@ -149,28 +109,28 @@
 
         {{-- Stats Cards --}}
         <div class="grid grid-cols-3 gap-4 mb-4">
-            <x-filament::section :compact="true">
-                <div class="text-center py-1">
+            <x-filament::section>
+                <div class="text-center py-2">
                     <p class="text-xl font-bold text-gray-900 dark:text-white">{{ $classRoom->name }}</p>
-                    <p class="text-xs text-gray-500 mt-0.5">{{ $year->name }}</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ $year->name }}</p>
                 </div>
             </x-filament::section>
 
-            <x-filament::section :compact="true">
-                <div class="text-center py-1">
+            <x-filament::section>
+                <div class="text-center py-2">
                     <p class="text-xl font-bold {{ $stats['pct'] == 100 ? 'text-success-600 dark:text-success-400' : 'text-warning-600 dark:text-warning-400' }}">
                         {{ $stats['pct'] }}%
                     </p>
-                    <p class="text-xs text-gray-500 mt-0.5">{{ $stats['filled'] }} / {{ $stats['total'] }} nilai terisi</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ $stats['filled'] }} / {{ $stats['total'] }} nilai terisi</p>
                 </div>
             </x-filament::section>
 
-            <x-filament::section :compact="true">
-                <div class="text-center py-1">
+            <x-filament::section>
+                <div class="text-center py-2">
                     <p class="text-xl font-bold {{ $stats['done'] === $stats['total_students'] && $stats['total_students'] > 0 ? 'text-success-600 dark:text-success-400' : 'text-gray-900 dark:text-white' }}">
                         {{ $stats['done'] }} / {{ $stats['total_students'] }}
                     </p>
-                    <p class="text-xs text-gray-500 mt-0.5">siswa nilai lengkap</p>
+                    <p class="text-xs text-gray-500 mt-1">siswa nilai lengkap</p>
                 </div>
             </x-filament::section>
         </div>

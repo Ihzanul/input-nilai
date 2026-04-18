@@ -181,73 +181,134 @@ class MonitoringNilaiKelas extends Page implements HasForms, HasTable
                 ->whereIn('student_id', Student::where('class_room_id', $classRoom->id)->pluck('id'))
                 ->get()->groupBy('student_id');
 
-            $columns = [
-                TextColumn::make('nisn')
-                    ->label('NISN')
-                    ->searchable()
-                    ->copyable()
-                    ->extraHeaderAttributes(['class' => 'fi-sticky-col fi-sticky-col-1'])
-                    ->extraAttributes(['class' => 'fi-sticky-col fi-sticky-col-1']),
-                TextColumn::make('name')
-                    ->label('Nama Siswa')
-                    ->searchable()
-                    ->sortable()
-                    ->extraHeaderAttributes(['class' => 'fi-sticky-col fi-sticky-col-2'])
-                    ->extraAttributes(['class' => 'fi-sticky-col fi-sticky-col-2']),
-                TextColumn::make('agama')
-                    ->label('Agama')
-                    ->badge()
-                    ->getStateUsing(fn(Student $r) => is_object($r->agama) ? $r->agama->value : ($r->agama ?? '—'))
-                    ->color(fn(Student $r) => match(is_object($r->agama) ? $r->agama->value : $r->agama) {
-                        'Islam'    => 'success',
-                        'Kristen'  => 'info',
-                        'Katolik'  => 'primary',
-                        'Hindu'    => 'warning',
-                        'Budha'    => 'danger',
-                        'Konghucu' => 'gray',
-                        default    => 'gray',
-                    }),
-            ];
-
+            $subjectColumns = [];
             foreach ($subjects as $subject) {
                 $sid = $subject->id;
-                $columns[] = TextColumn::make('score_' . $sid)
-                    ->label($subject->name)
+                $subjectColumns[] = \Filament\Tables\Columns\TextColumn::make('score_' . $sid)
                     ->getStateUsing(function (Student $record) use ($sid, $scores) {
                         return $scores->get($record->id, collect())->firstWhere('subject_id', $sid)?->score_us;
                     })
-                    ->placeholder('—')
+                    ->formatStateUsing(function ($state) use ($subject) {
+                       return $subject->name . ': ' . ($state ?? '—');
+                    })
                     ->badge()
                     ->color(function (Student $record) use ($sid, $scores) {
                         $score = $scores->get($record->id, collect())->firstWhere('subject_id', $sid);
                         if (!$score || $score->score_us === null) return 'gray';
                         return $score->score_us >= 75 ? 'success' : 'danger';
-                    })
-                    ->alignCenter();
+                    });
             }
 
             $total = $subjects->count();
-            $columns[] = TextColumn::make('status')
-                ->label('Status')
-                ->getStateUsing(fn(Student $r) => $total === 0 ? '—'
-                    : ($scores->get($r->id, collect())->whereNotNull('score_us')->count() === $total
-                        ? 'Lengkap'
-                        : $scores->get($r->id, collect())->whereNotNull('score_us')->count() . '/' . $total))
-                ->badge()
-                ->color(fn(Student $r) => $total > 0 && $scores->get($r->id, collect())->whereNotNull('score_us')->count() === $total
-                    ? 'success' : 'warning')
-                ->alignCenter();
+
+            $columns = [
+                \Filament\Tables\Columns\Layout\Split::make([
+                    \Filament\Tables\Columns\Layout\Stack::make([
+                        \Filament\Tables\Columns\TextColumn::make('name')
+                            ->weight('bold')
+                            ->searchable()
+                            ->sortable(),
+                        \Filament\Tables\Columns\TextColumn::make('nisn')
+                            ->color('gray')
+                            ->searchable(),
+                    ]),
+                    \Filament\Tables\Columns\Layout\Stack::make([
+                        \Filament\Tables\Columns\TextColumn::make('agama')
+                            ->badge()
+                            ->getStateUsing(fn(Student $r) => is_object($r->agama) ? $r->agama->value : ($r->agama ?? '—'))
+                            ->color(fn(Student $r) => match(is_object($r->agama) ? $r->agama->value : $r->agama) {
+                                'Islam'    => 'success',
+                                'Kristen'  => 'info',
+                                'Katolik'  => 'primary',
+                                'Hindu'    => 'warning',
+                                'Budha'    => 'danger',
+                                'Konghucu' => 'gray',
+                                default    => 'gray',
+                            }),
+                    ])->space(1),
+                    \Filament\Tables\Columns\Layout\Stack::make([
+                        \Filament\Tables\Columns\TextColumn::make('status')
+                            ->getStateUsing(fn(Student $r) => $total === 0 ? 'Belum Ada Mapel'
+                                : ($scores->get($r->id, collect())->whereNotNull('score_us')->count() === $total
+                                    ? 'Lengkap'
+                                    : $scores->get($r->id, collect())->whereNotNull('score_us')->count() . '/' . $total . ' Terisi'))
+                            ->badge()
+                            ->color(fn(Student $r) => $total > 0 && $scores->get($r->id, collect())->whereNotNull('score_us')->count() === $total
+                                ? 'success' : 'warning'),
+                    ])->space(1)->alignRight(),
+                ]),
+                \Filament\Tables\Columns\Layout\Panel::make([
+                    \Filament\Tables\Columns\Layout\Grid::make(['default' => 1, 'sm' => 2, 'lg' => 3, 'xl' => 4])
+                        ->schema($subjectColumns)
+                ])->collapsible(),
+            ];
 
             return $table
                 ->query(Student::query()->where('class_room_id', $classRoom->id)->orderBy('name'))
                 ->columns($columns)
-                ->paginated(false);
+                ->contentGrid([
+                    'md' => 1,
+                ]);
+
         }
 
         // ── Mode 1: Ringkasan semua kelas (fallback / admin tanpa pilihan) ────
+        if (!$year) {
+            return $table->query(ClassRoom::query()->whereNull('id'))->columns([])->paginated(false);
+        }
+
         return $table
-            ->query(Student::query()->whereNull('id')) // empty, summary pakai blade
-            ->columns([])
+            ->query(
+                ClassRoom::query()
+                    ->with('waliKelas')
+                    ->withCount('students')
+                    ->withCount(['subjectTeachers' => fn($q) => $q->where('academic_year_id', $year->id)])
+                    ->withCount(['scores as submitted_count' => fn($q) => 
+                        $q->where('scores.academic_year_id', $year->id)->whereNotNull('score_us')
+                    ])
+            )
+            ->columns([
+                TextColumn::make('name')
+                    ->label('Kelas')
+                    ->sortable()
+                    ->searchable()
+                    ->weight('bold'),
+                TextColumn::make('waliKelas.name')
+                    ->label('Wali Kelas')
+                    ->placeholder('—')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('students_count')
+                    ->label('Siswa')
+                    ->alignCenter()
+                    ->sortable(),
+                TextColumn::make('subject_teachers_count')
+                    ->label('Mapel')
+                    ->alignCenter()
+                    ->sortable(),
+                TextColumn::make('submitted_count')
+                    ->label('Nilai Masuk')
+                    ->alignCenter()
+                    ->getStateUsing(function (ClassRoom $record) {
+                        $expected = $record->students_count * $record->subject_teachers_count;
+                        return $record->submitted_count . ' / ' . $expected;
+                    }),
+                TextColumn::make('progres')
+                    ->label('Progres')
+                    ->alignRight()
+                    ->getStateUsing(function (ClassRoom $record) {
+                        $expected = $record->students_count * $record->subject_teachers_count;
+                        $pct = $expected > 0 ? round(($record->submitted_count / $expected) * 100) : 0;
+                        return $pct . '%';
+                    })
+                    ->badge()
+                    ->color(function (ClassRoom $record) {
+                        $expected = $record->students_count * $record->subject_teachers_count;
+                        $pct = $expected > 0 ? round(($record->submitted_count / $expected) * 100) : 0;
+                        return $pct == 100 ? 'success' : ($pct >= 50 ? 'warning' : 'danger');
+                    }),
+            ])
+            ->defaultSort('name')
             ->paginated(false);
     }
 }

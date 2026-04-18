@@ -27,7 +27,7 @@ class StudentTemplateExport implements FromArray, WithHeadings, WithStyles, Shou
     {
         return [
             1 => [
-                'font' => ['bold' => true],
+                // 'font' => ['bold' => true],
                 'fill' => ['fillType' => 'solid', 'startColor' => ['rgb' => '1D6FA4']],
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             ],
