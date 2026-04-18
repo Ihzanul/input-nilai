@@ -172,6 +172,7 @@ class InputNilai extends Page implements HasForms, HasTable
                         }
                     }),
             ])
-            ->paginated(false);
+            ->paginated([10, 25, 50, 'all'])
+            ->defaultPaginationPageOption(50);
     }
 }
