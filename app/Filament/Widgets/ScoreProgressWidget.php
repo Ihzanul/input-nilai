@@ -38,14 +38,22 @@ class ScoreProgressWidget extends BaseWidget
                 ->where('academic_year_id', $activeYear->id)
                 ->get();
 
+            // Ambil semua siswa dari kelas-kelas yang diajarkan dalam 1 query (mencegah N+1)
+            $classIds = $subjectTeachers->pluck('class_room_id')->unique();
+            $studentsByClass = Student::whereIn('class_room_id', $classIds)->get();
+
             $expectedScores = 0;
             foreach ($subjectTeachers as $st) {
-                // Jika ada filter agama, hitung hanya siswa beragama itu
-                $query = Student::where('class_room_id', $st->class_room_id);
+                // Hitung dari collection di memori (tidak hit SQL Server)
+                $students = $studentsByClass->where('class_room_id', $st->class_room_id);
                 if ($st->agama_filter) {
-                    $query->where('agama', $st->agama_filter);
+                    // Enum comparison if applicable, but comparing values usually string.
+                    $filter = is_object($st->agama_filter) ? $st->agama_filter->value : $st->agama_filter;
+                    $students = $students->filter(function($s) use ($filter) {
+                        return (is_object($s->agama) ? $s->agama->value : $s->agama) === $filter;
+                    });
                 }
-                $expectedScores += $query->count();
+                $expectedScores += $students->count();
             }
 
             $submittedScores = Score::where('teacher_id', $user->id)
